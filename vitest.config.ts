@@ -21,13 +21,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      exclude: [
-        "node_modules/**",
-        ".next/**",
-        "tests/e2e/**",
-        "**/*.config.{ts,js}",
-        "**/*.d.ts",
-      ],
+      exclude: ["node_modules/**", ".next/**", "tests/e2e/**", "**/*.config.{ts,js}", "**/*.d.ts"],
     },
     projects: [
       {
@@ -54,6 +48,7 @@ export default defineConfig({
           include: [
             "app/actions/**/*.test.ts",
             "src/infrastructure/**/*.test.ts",
+            "lib/config/**/*.test.ts",
           ],
           setupFiles: ["./tests/setup.server.ts"],
         },

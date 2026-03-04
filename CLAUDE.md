@@ -8,16 +8,55 @@ A production-ready Next.js 15 starter that enforces Hexagonal (Ports & Adapters)
 
 ## Commands
 
-| Command | What It Does |
-|---------|-------------|
-| `pnpm dev` | Start the Next.js development server on :3000 |
-| `pnpm test` | Run all unit + server tests via Vitest |
-| `pnpm test:unit` | Run client-side unit tests only (jsdom environment) |
-| `pnpm test:server` | Run server-side tests only (Node environment) |
-| `pnpm test:coverage` | Run all tests with V8 coverage report |
-| `pnpm test:e2e` | Run Playwright end-to-end tests (requires dev server) |
-| `pnpm lint` | Run ESLint with Next.js rules + boundary enforcement |
-| `pnpm type-check` | Run `tsc --noEmit` — no emit, just type validation |
+| Command              | What It Does                                          |
+| -------------------- | ----------------------------------------------------- |
+| `pnpm dev`           | Start the Next.js development server on :3000         |
+| `pnpm test`          | Run all unit + server tests via Vitest                |
+| `pnpm test:unit`     | Run client-side unit tests only (jsdom environment)   |
+| `pnpm test:server`   | Run server-side tests only (Node environment)         |
+| `pnpm test:coverage` | Run all tests with V8 coverage report                 |
+| `pnpm test:e2e`      | Run Playwright end-to-end tests (requires dev server) |
+| `pnpm lint`          | Run ESLint with Next.js rules + boundary enforcement  |
+| `pnpm type-check`    | Run `tsc --noEmit` — no emit, just type validation    |
+
+---
+
+## Git Hooks (Husky)
+
+| Hook         | Trigger      | What runs                                            |
+| ------------ | ------------ | ---------------------------------------------------- |
+| `commit-msg` | every commit | commitlint — validates message format                |
+| `pre-commit` | every commit | lint-staged — ESLint + Prettier on staged files only |
+| `pre-push`   | every push   | `pnpm test` — full unit + server test suite          |
+
+E2E tests (Playwright) are intentionally excluded from pre-push — they require a running dev server.
+
+### Conventional Commits format
+
+```
+<type>(<scope>): <subject>
+
+feat(auth): add JWT token refresh
+fix(todo): prevent double-complete on concurrent requests
+test(domain): add edge cases for TodoTitle value object
+chore(deps): upgrade next to 15.3.0
+```
+
+**Allowed types:** `feat` · `fix` · `docs` · `style` · `refactor` · `test` · `chore` · `perf` · `ci` · `revert`
+
+Rules enforced by commitlint (`commitlint.config.ts`):
+
+- type must be from the list above
+- subject must be lowercase
+- subject must not end with a period
+- header max 100 chars
+
+### Skip hooks (emergency only)
+
+```bash
+git commit --no-verify   # skip commit-msg + pre-commit
+git push --no-verify     # skip pre-push tests
+```
 
 ---
 
@@ -51,16 +90,17 @@ A production-ready Next.js 15 starter that enforces Hexagonal (Ports & Adapters)
 
 ### What Lives in Each Layer
 
-| Layer | Path | Contents |
-|-------|------|----------|
-| Domain | `src/domain/` | Entities, Value Objects, Domain Errors, Repository interfaces (ports) |
-| Application | `src/application/` | Use Cases, DTOs, Application Errors, Port interfaces |
-| Infrastructure | `src/infrastructure/` | Repository implementations (in-memory, DB, etc.), Composition Root |
-| Presentation | `components/`, `app/actions/` | React Server/Client Components, Server Actions |
+| Layer          | Path                          | Contents                                                              |
+| -------------- | ----------------------------- | --------------------------------------------------------------------- |
+| Domain         | `src/domain/`                 | Entities, Value Objects, Domain Errors, Repository interfaces (ports) |
+| Application    | `src/application/`            | Use Cases, DTOs, Application Errors, Port interfaces                  |
+| Infrastructure | `src/infrastructure/`         | Repository implementations (in-memory, DB, etc.), Composition Root    |
+| Presentation   | `components/`, `app/actions/` | React Server/Client Components, Server Actions                        |
 
 ### Where Server Actions Live
 
 Server Actions sit in `app/actions/` and belong to the **Presentation layer**. They:
+
 1. Validate raw input with Zod
 2. Call the relevant Use Case (Application layer)
 3. Call `revalidatePath` / `revalidateTag` to bust the Next.js cache
@@ -78,14 +118,14 @@ This keeps the Application and Domain layers free of Next.js dependencies.
 
 Tests are co-located in `__tests__/` folders next to the source file they test.
 
-| Source location | Test environment | Vitest project |
-|----------------|-----------------|----------------|
-| `src/domain/**/__tests__/` | jsdom | client |
-| `src/application/**/__tests__/` | jsdom | client |
-| `components/**/__tests__/` | jsdom | client |
-| `src/infrastructure/**/__tests__/` | node | server |
-| `app/actions/__tests__/` | node | server |
-| `tests/e2e/` | — | Playwright |
+| Source location                    | Test environment | Vitest project |
+| ---------------------------------- | ---------------- | -------------- |
+| `src/domain/**/__tests__/`         | jsdom            | client         |
+| `src/application/**/__tests__/`    | jsdom            | client         |
+| `components/**/__tests__/`         | jsdom            | client         |
+| `src/infrastructure/**/__tests__/` | node             | server         |
+| `app/actions/__tests__/`           | node             | server         |
+| `tests/e2e/`                       | —                | Playwright     |
 
 Run a single project: `pnpm test:unit` (client) or `pnpm test:server` (server).
 
@@ -119,42 +159,73 @@ Follow this order — never skip steps.
 
 Next.js loads `.env` files natively — **no dotenv needed**.
 
-| File | Loaded when | Commit? |
-|------|------------|---------|
-| `.env.example` | never (documentation only) | **yes** |
-| `.env.local` | always, overrides everything | **no** |
-| `.env.development` | `next dev` only | yes (no secrets) |
-| `.env.production` | `next build` / `next start` only | yes (no secrets) |
-| `.env.test` | Vitest / test runner only | yes (no secrets) |
+| File               | Loaded when                      | Commit?          |
+| ------------------ | -------------------------------- | ---------------- |
+| `.env.example`     | never (documentation only)       | **yes**          |
+| `.env.local`       | always, overrides everything     | **no**           |
+| `.env.development` | `next dev` only                  | yes (no secrets) |
+| `.env.production`  | `next build` / `next start` only | yes (no secrets) |
+| `.env.test`        | Vitest / test runner only        | yes (no secrets) |
 
 **Setup for a new dev:**
+
 ```bash
 cp .env.example .env.local
 # fill in real values in .env.local
 ```
 
 **Rules:**
+
 - `NEXT_PUBLIC_` prefix → exposed to the browser (client-side bundle)
 - No prefix → server-side only (Server Components, Server Actions, API routes)
 - Never put secrets in `NEXT_PUBLIC_*` variables
 
 **Accessing env vars in the architecture:**
-- Server Actions and infrastructure adapters can read `process.env.MY_VAR` directly
-- Pass values to use cases via constructor injection in the composition root — never read `process.env` inside domain or application layers
+
+- **Never** read `process.env` directly in domain or application layers
+- Import `serverEnv` in: Server Actions, infrastructure adapters, composition root
+- Import `clientEnv` in: Client Components that need public config
+
+**Config files:**
+
+| File                       | Purpose                                                          | Import in                                        |
+| -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------ |
+| `lib/config/env.server.ts` | Validates all vars including secrets — throws on boot if invalid | Server Actions, Infrastructure, Composition Root |
+| `lib/config/env.client.ts` | Only `NEXT_PUBLIC_*` vars — safe for browser                     | Client Components                                |
+
+**Adding a new env var:**
+
+1. Add to `.env.example` with a comment
+2. Add to `.env.local` with the real value
+3. Add to the Zod schema in `env.server.ts` (secrets) or `env.client.ts` (public)
+4. For `NEXT_PUBLIC_*` vars: add the key explicitly in `validateClientEnv()` — Next.js requires static references, not `process.env[key]`
+
+**Important — `NEXT_PUBLIC_*` static references:**
+
+```typescript
+// env.client.ts — CORRECT: explicit reference
+const parsed = clientEnvSchema.safeParse({
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL, // ← must be literal
+});
+
+// WRONG: Next.js bundler cannot replace dynamic access
+const key = "NEXT_PUBLIC_APP_URL";
+process.env[key]; // ← undefined at runtime in the browser
+```
 
 ---
 
 ## Path Aliases
 
-| Alias | Resolves to |
-|-------|-------------|
-| `@/*` | `src/*` |
-| `@domain/*` | `src/domain/*` |
-| `@application/*` | `src/application/*` |
+| Alias               | Resolves to            |
+| ------------------- | ---------------------- |
+| `@/*`               | `src/*`                |
+| `@domain/*`         | `src/domain/*`         |
+| `@application/*`    | `src/application/*`    |
 | `@infrastructure/*` | `src/infrastructure/*` |
-| `@components/*` | `components/*` |
-| `@lib/*` | `lib/*` |
-| `@actions/*` | `app/actions/*` |
+| `@components/*`     | `components/*`         |
+| `@lib/*`            | `lib/*`                |
+| `@actions/*`        | `app/actions/*`        |
 
 Defined in both `tsconfig.json` and `vitest.config.ts`. Test files excluded from `tsc --noEmit` via `tsconfig.json` exclude list.
 
@@ -168,6 +239,7 @@ Defined in both `tsconfig.json` and `vitest.config.ts`. Test files excluded from
 4. No other file changes required.
 
 Example:
+
 ```typescript
 // Before
 import { InMemoryTodoRepository } from "../repositories/InMemoryTodoRepository";
