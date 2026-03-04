@@ -1,4 +1,5 @@
-import { vi } from "vitest";
+import { vi, beforeAll, afterEach, afterAll } from "vitest";
+import { server } from "../src/infrastructure/http/mocks/server";
 
 // Mock next/cache
 vi.mock("next/cache", () => ({
@@ -26,3 +27,8 @@ vi.mock("next/headers", () => ({
     }),
   ),
 }));
+
+// MSW Node server — intercepts fetch in all server-project tests
+beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());

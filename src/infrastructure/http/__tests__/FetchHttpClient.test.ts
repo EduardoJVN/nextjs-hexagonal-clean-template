@@ -25,12 +25,14 @@ describe("FetchHttpClient", () => {
   let client: FetchHttpClient;
 
   beforeEach(() => {
-    client = new FetchHttpClient(BASE_URL);
+    // Disable retry by default in unit tests to avoid delays
+    client = new FetchHttpClient(BASE_URL, { retry: { attempts: 1 } });
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   describe("GET", () => {
@@ -65,7 +67,8 @@ describe("FetchHttpClient", () => {
 
     it("merges defaultHeaders into every request", async () => {
       const clientWithAuth = new FetchHttpClient(BASE_URL, {
-        Authorization: "Bearer token-abc",
+        defaultHeaders: { Authorization: "Bearer token-abc" },
+        retry: { attempts: 1 },
       });
       vi.mocked(fetch).mockResolvedValue(makeMockResponse(200, {}));
 
@@ -215,6 +218,102 @@ describe("FetchHttpClient", () => {
           body: JSON.stringify(payload),
         }),
       );
+    });
+  });
+
+  describe("retry logic", () => {
+    it("retries on NetworkError and calls fetch the configured number of times", async () => {
+      vi.useFakeTimers();
+      const retryClient = new FetchHttpClient(BASE_URL, {
+        retry: { attempts: 2, delayMs: 100, backoffFactor: 2 },
+      });
+      vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+
+      // Run timers alongside the promise so sleeps resolve
+      const promise = retryClient.get("/todos").catch((e) => e);
+      await vi.runAllTimersAsync();
+      const err = await promise;
+
+      expect(err).toBeInstanceOf(NetworkError);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on 503 ServiceUnavailableError and calls fetch the configured number of times", async () => {
+      vi.useFakeTimers();
+      const retryClient = new FetchHttpClient(BASE_URL, {
+        retry: { attempts: 2, delayMs: 100, backoffFactor: 2 },
+      });
+      vi.mocked(fetch).mockResolvedValue(makeMockResponse(503));
+
+      const promise = retryClient.get("/todos").catch((e) => e);
+      await vi.runAllTimersAsync();
+      const err = await promise;
+
+      expect(err).toBeInstanceOf(ServiceUnavailableError);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("does NOT retry on 401 UnauthorizedError — fetch called exactly once", async () => {
+      vi.useFakeTimers();
+      const retryClient = new FetchHttpClient(BASE_URL, {
+        retry: { attempts: 3, delayMs: 100, backoffFactor: 2 },
+      });
+      vi.mocked(fetch).mockResolvedValue(makeMockResponse(401));
+
+      const promise = retryClient.get("/todos").catch((e) => e);
+      await vi.runAllTimersAsync();
+      const err = await promise;
+
+      expect(err).toBeInstanceOf(UnauthorizedError);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT retry on 404 NotFoundError — fetch called exactly once", async () => {
+      vi.useFakeTimers();
+      const retryClient = new FetchHttpClient(BASE_URL, {
+        retry: { attempts: 3, delayMs: 100, backoffFactor: 2 },
+      });
+      vi.mocked(fetch).mockResolvedValue(makeMockResponse(404));
+
+      const promise = retryClient.get("/todos/missing").catch((e) => e);
+      await vi.runAllTimersAsync();
+      const err = await promise;
+
+      expect(err).toBeInstanceOf(NotFoundError);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("exhausts all retries and throws the last error", async () => {
+      vi.useFakeTimers();
+      const retryClient = new FetchHttpClient(BASE_URL, {
+        retry: { attempts: 3, delayMs: 50, backoffFactor: 2 },
+      });
+      vi.mocked(fetch).mockRejectedValue(new TypeError("connection reset"));
+
+      const promise = retryClient.get("/todos").catch((e) => e);
+      await vi.runAllTimersAsync();
+      const err = await promise;
+
+      expect(err).toBeInstanceOf(NetworkError);
+      expect(fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it("succeeds on a later retry when the first attempt fails with NetworkError", async () => {
+      vi.useFakeTimers();
+      const data = [{ todo_id: "1" }];
+      const retryClient = new FetchHttpClient(BASE_URL, {
+        retry: { attempts: 3, delayMs: 100, backoffFactor: 2 },
+      });
+      vi.mocked(fetch)
+        .mockRejectedValueOnce(new TypeError("transient failure"))
+        .mockResolvedValue(makeMockResponse(200, data));
+
+      const promise = retryClient.get("/todos");
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(result).toEqual(data);
+      expect(fetch).toHaveBeenCalledTimes(2);
     });
   });
 });

@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.3",
+    "msw": "^2.7.0",
     "@commitlint/config-conventional": "^20.4.3",
     "@commitlint/types": "^20.4.3",
     "@playwright/test": "^1.50.1",

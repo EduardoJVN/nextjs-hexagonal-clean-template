@@ -294,6 +294,73 @@ Set `API_BASE_URL` in `.env.local` to activate `HttpTodoRepository` automaticall
 
 ---
 
+## Loading States
+
+`app/loading.tsx` — Next.js renders this automatically while the route segment is loading (Suspense boundary). Shows an `animate-pulse` skeleton matching the page layout.
+
+`components/todo/TodoListSkeleton.tsx` — reusable skeleton for the todo list. Use in Suspense fallbacks in nested layouts.
+
+Add per-route loading by creating `app/{route}/loading.tsx` — Next.js picks it up automatically.
+
+---
+
+## React.cache() — Request Deduplication
+
+`src/infrastructure/cache/todo.cache.ts` wraps read use cases in `React.cache()`. Multiple Server Components calling `getCachedTodos()` in the same SSR request tree will only trigger one actual use case execution.
+
+```typescript
+// ✅ Use this in Server Components — not Server Actions
+import { getCachedTodos } from "@infrastructure/cache";
+const todos = await getCachedTodos();
+
+// ❌ Don't route RSC → RSC through Server Actions — adds serialization overhead
+const result = await listTodosAction();
+```
+
+Write operations (create, complete, delete) go through Server Actions — they are intentionally NOT cached.
+
+---
+
+## MSW — API Mocking
+
+`src/infrastructure/http/mocks/` contains MSW handler definitions that intercept real `fetch` calls.
+
+**In tests (Node/Vitest):** the MSW server is started automatically via `tests/setup.server.ts`. All server-environment tests run against the mock API by default. Override specific routes per test:
+
+```typescript
+import { server } from "@infrastructure/http/mocks";
+import { http, HttpResponse } from "msw";
+
+server.use(http.get("*/todos", () => HttpResponse.json([])));
+```
+
+**In dev (browser):** import and start the worker in your app entry point:
+
+```typescript
+// app/layout.tsx or a client component
+import { worker } from "@infrastructure/http/mocks/browser";
+if (process.env.NODE_ENV === "development") {
+  await worker.start();
+}
+```
+
+---
+
+## Retry Logic
+
+`FetchHttpClient` retries automatically on transient failures. Default: 3 attempts, 300ms initial delay, 2x backoff.
+
+```typescript
+new FetchHttpClient(baseUrl, {
+  retry: { attempts: 3, delayMs: 300, backoffFactor: 2 },
+});
+```
+
+Retries on: `NetworkError`, `ServiceUnavailableError` (503).
+Does NOT retry on: 4xx errors — these are client errors, retrying won't help.
+
+---
+
 ## ESLint Boundary Enforcement
 
 The `.eslintrc.json` contains two mechanisms:

@@ -11,6 +11,7 @@
 import { Suspense } from "react";
 import { TodoListContainer } from "@components/todo/TodoListContainer";
 import { TodoFormWrapper } from "@components/todo/TodoFormWrapper";
+import { TodoListSkeleton } from "@components/todo/TodoListSkeleton";
 
 export default async function HomePage() {
   return (
@@ -27,11 +28,7 @@ export default async function HomePage() {
 
       {/* Async RSC: fetches todos via Server Action, renders list */}
       <section>
-        <Suspense
-          fallback={
-            <p className="text-sm text-muted-foreground">Loading todos…</p>
-          }
-        >
+        <Suspense fallback={<TodoListSkeleton />}>
           <TodoListContainer />
         </Suspense>
       </section>
