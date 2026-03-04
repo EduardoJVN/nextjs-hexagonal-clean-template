@@ -231,24 +231,66 @@ Defined in both `tsconfig.json` and `vitest.config.ts`. Test files excluded from
 
 ---
 
+## HTTP Client & External API
+
+Set `API_BASE_URL` in `.env.local` — the composition root switches automatically from `InMemoryTodoRepository` to `HttpTodoRepository`. No code changes needed.
+
+**Call flow:**
+
+```
+Server Action → Use Case → ITodoRepository
+                                ↓
+                    HttpTodoRepository (adapter)
+                                ↓
+                    IHttpClient (port) ← FetchHttpClient (adapter)
+                                ↓
+                          External REST API
+```
+
+**Anti-Corruption Layer (ACL):** the external API uses its own field names (`todo_id`, `todo_title`, `is_done`). `TodoApiMapper` translates between API shape ↔ domain model. Never let the API shape leak into domain.
+
+```
+src/infrastructure/acl/todo/
+├── TodoApiTypes.ts   ← external API response/payload types
+└── TodoApiMapper.ts  ← toDomain() + toPayload()
+```
+
+**HTTP Error hierarchy:**
+
+```
+HttpError
+├── NetworkError              — connection failure
+└── ApiError
+    ├── UnauthorizedError     — 401
+    ├── ForbiddenError        — 403
+    ├── NotFoundError         — 404
+    └── ServiceUnavailableError — 503
+```
+
+`HttpTodoRepository.findById()` catches `NotFoundError` → returns `null`. All other errors propagate to the Server Action → `fail(error.message)`.
+
+**Adding a new domain's HTTP adapter:**
+
+1. Define API types in `src/infrastructure/acl/{domain}/TodoApiTypes.ts`
+2. Create mapper `TodoApiMapper.ts` with `toDomain()` + `toPayload()`
+3. Create `Http{Domain}Repository` implementing the domain port
+4. Wire in `src/infrastructure/composition/{domain}.composition.ts`
+
+---
+
+## Security Headers
+
+Defined in `next.config.ts` for all routes: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. `unsafe-eval` and `unsafe-inline` in CSP are required by Next.js — tighten with nonces in production if needed.
+
+---
+
 ## How to Replace In-Memory Adapters with Real Ones
 
-1. Create a new adapter in `src/infrastructure/repositories/` that implements the port from `src/domain/`.
-2. Write tests for the new adapter (use a real DB connection or test container).
-3. Open `src/infrastructure/composition/todo.composition.ts` and swap the import — replace the in-memory constructor call with the real one.
-4. No other file changes required.
+Set `API_BASE_URL` in `.env.local` to activate `HttpTodoRepository` automatically via the composition root. For a DB adapter instead:
 
-Example:
-
-```typescript
-// Before
-import { InMemoryTodoRepository } from "../repositories/InMemoryTodoRepository";
-const todoRepository = new InMemoryTodoRepository();
-
-// After
-import { PrismaTodoRepository } from "../repositories/PrismaTodoRepository";
-const todoRepository = new PrismaTodoRepository(prismaClient);
-```
+1. Implement the domain port (`ITodoRepository`) in `src/infrastructure/adapters/{db}/`
+2. Write port compliance tests
+3. Update `src/infrastructure/composition/todo.composition.ts` to instantiate the new adapter
 
 ---
 

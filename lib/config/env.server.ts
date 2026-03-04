@@ -9,6 +9,10 @@ const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),
 
+  // External REST API base URL (no trailing slash).
+  // When set, the app uses HttpTodoRepository instead of InMemoryTodoRepository.
+  API_BASE_URL: z.url({ error: "API_BASE_URL must be a valid URL" }).optional(),
+
   // Uncomment and add your server-side secrets here:
   // DATABASE_URL: z.url({ error: "DATABASE_URL must be a valid URL" }),
   // API_SECRET_KEY: z.string().min(1, { error: "API_SECRET_KEY is required" }),

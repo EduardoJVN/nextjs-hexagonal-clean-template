@@ -1,4 +1,5 @@
 export { Todo } from "./Todo";
+export type { TodoPrimitives } from "./Todo";
 export { TodoId } from "./TodoId";
 export { TodoTitle } from "./TodoTitle";
 export {

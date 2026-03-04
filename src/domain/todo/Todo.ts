@@ -3,7 +3,7 @@ import { TodoId } from "./TodoId";
 import { TodoTitle } from "./TodoTitle";
 import { TodoAlreadyCompletedError } from "./TodoErrors";
 
-interface TodoPrimitives {
+export interface TodoPrimitives {
   id: string;
   title: string;
   completedAt: Date | null;
@@ -15,12 +15,7 @@ export class Todo extends AggregateRoot<TodoId> {
   private _completedAt: Date | null;
   private readonly _createdAt: Date;
 
-  private constructor(
-    id: TodoId,
-    title: TodoTitle,
-    completedAt: Date | null,
-    createdAt: Date,
-  ) {
+  private constructor(id: TodoId, title: TodoTitle, completedAt: Date | null, createdAt: Date) {
     super(id);
     this._title = title;
     this._completedAt = completedAt;
