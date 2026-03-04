@@ -1,0 +1,86 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "import"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["*/application/*", "*/infrastructure/*", "next", "next/*", "react", "react/*"],
+            "importNames": [],
+            "message": "Domain layer cannot import from application, infrastructure, or framework layers. Keep the domain pure."
+          }
+        ]
+      }
+    ],
+    "import/no-restricted-paths": [
+      "error",
+      {
+        "zones": [
+          {
+            "target": "./src/domain",
+            "from": ["./src/application", "./src/infrastructure", "./app", "./components"],
+            "message": "Domain must not import from application, infrastructure, or presentation layers."
+          },
+          {
+            "target": "./src/application",
+            "from": ["./src/infrastructure", "./app", "./components"],
+            "message": "Application layer must not import from infrastructure or presentation layers."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["./src/domain/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/application/**",
+                  "**/infrastructure/**",
+                  "next",
+                  "next/*",
+                  "react",
+                  "react/*",
+                  "@application/*",
+                  "@infrastructure/*"
+                ],
+                "message": "Domain layer cannot import from application, infrastructure, or framework layers."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["./src/application/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/infrastructure/**",
+                  "next",
+                  "next/*",
+                  "@infrastructure/*"
+                ],
+                "message": "Application layer cannot import from infrastructure or Next.js framework."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
